@@ -64,6 +64,7 @@ iikshana-courtroom-accessibility/
 ├── data/
 │   ├── legal_glossary/      # 500+ legal terms
 │   └── raw/                 # Evaluation datasets
+├── data-pipeline/           # Data acquisition, preprocessing, validation, evaluation (Airflow + DVC)
 ├── docs/                    # Architecture, API docs
 └── config/                  # Environment configs
 ```

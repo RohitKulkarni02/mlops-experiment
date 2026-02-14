@@ -1,0 +1,142 @@
+For your next assignment, ensure that you focus on all the steps involved in the data pipeline. This includes creating codes for data preprocessing, developing test modules for your codes, creating workflows, writing code to download data, and performing data versioning using DVC and airflow dags. If you require additional tools to run your pipeline, you are free to use them. You must thoroughly document the entire assignment in the README file of your GitHub repository. Your code should be properly structured in folder format. Refer to open source projects on GitHub repo like scikit-learn on how they structure the code. (Use that as your reference). You should also provide steps on how to replicate this code on other people's machines. Your code should run without any errors.
+Based on your project proposal and the assignment guidelines, here’s a comprehensive breakdown of what you need to submit for the Data Pipeline assignment:
+Overview of Your Submission
+You need to create a complete data pipeline using Apache Airflow that processes the evaluation datasets (RAVDESS, IEMOCAP, CREMA-D, MELD, etc.) for your Iikshana project. Since you’re using pre-trained models (Google’s Gemini 2.0 Flash, Chirp 3, etc.), your pipeline will focus on data acquisition, preprocessing, evaluation, and monitoring rather than training.
+Detailed Components to Implement
+ 1.⁠ ⁠Data Acquisition DAG Tasks
+Create Airflow tasks to:
+	∙	Download emotion recognition datasets (RAVDESS, IEMOCAP, CREMA-D, MELD, TESS, SAVEE, EMO-DB)
+	∙	Download multilingual speech datasets (Mozilla Common Voice, VoxPopuli, MLS, FLEURS, LibriSpeech)
+	∙	Validate checksums and file integrity
+	∙	Store raw data in data/raw/ with DVC tracking
+ 2.⁠ ⁠Data Preprocessing DAG Tasks
+Implement preprocessing steps for:
+	∙	Audio preprocessing: Convert to 16 kHz mono WAV, loudness normalization, silence trimming
+	∙	Stratified splitting: Create Dev (20%), Test (70%), Holdout (10%) splits by:
+	∙	Speaker identity (no overlap)
+	∙	Language, emotion class, demographics
+	∙	Audio quality (SNR), video conditions
+	∙	Legal glossary preparation: Process 500+ legal terms for translation validation
+	∙	Store processed data in data/processed/ with DVC versioning
+ 3.⁠ ⁠Data Validation & Schema Generation
+Use Great Expectations or TFDV to:
+	∙	Define expected audio file formats, sample rates, durations
+	∙	Validate emotion labels (8 classes for RAVDESS, 5 for IEMOCAP, etc.)
+	∙	Check for missing values, outliers in audio features
+	∙	Generate data quality reports automatically
+	∙	Create JSON schema files documenting your dataset structure
+ 4.⁠ ⁠Bias Detection via Data Slicing
+Implement using Fairlearn or custom slicing:
+	∙	Slice datasets by:
+	∙	Demographics (gender, accent in CREMA-D)
+	∙	Emotion classes
+	∙	Language groups
+	∙	Audio quality bins (high/medium/low SNR)
+	∙	Calculate performance metrics per slice (you’ll measure WER, F1, BLEU on test splits)
+	∙	Document any disparities found (e.g., “Female voices in TESS show X% better emotion detection than male voices in SAVEE”)
+	∙	Mitigation strategies: Re-sampling, stratified evaluation, confidence thresholding
+ 5.⁠ ⁠Model Evaluation Pipeline
+Create tasks to:
+	∙	Run Google STT Chirp 3 on test audio → Calculate WER
+	∙	Run Google Translation on transcripts → Calculate BLEU scores
+	∙	Run emotion detection → Calculate F1 scores
+	∙	Store evaluation metrics in a structured format (JSON/CSV)
+	∙	Compare against targets: WER < 10%, BLEU > 0.40, F1 > 0.70
+ 6.⁠ ⁠Anomaly Detection & Alerts
+Implement checks for:
+	∙	Missing audio files or corrupted downloads
+	∙	Unexpected audio duration distributions
+	∙	Label imbalances beyond thresholds
+	∙	Schema violations (wrong sample rate, channels)
+	∙	Set up email/Slack alerts when anomalies detected
+ 7.⁠ ⁠DVC Integration
+Track with DVC:
+
+data/raw/RAVDESS/
+data/raw/IEMOCAP/
+data/processed/dev/
+data/processed/test/
+data/processed/holdout/
+data/legal_glossary/
+
+
+Include .dvc files in Git, store actual data remotely (Google Cloud Storage or local remote)
+ 8.⁠ ⁠Logging & Monitoring
+Use Python’s logging module to:
+	∙	Log each DAG task execution (start, progress, completion)
+	∙	Track data volumes processed
+	∙	Record validation pass/fail results
+	∙	Save logs to logs/ directory with timestamps
+ 9.⁠ ⁠Pipeline Optimization
+Use Airflow’s Gantt Chart to:
+	∙	Identify bottlenecks (e.g., large dataset downloads)
+	∙	Parallelize independent tasks (download multiple datasets simultaneously)
+	∙	Optimize preprocessing (batch processing, multiprocessing)
+10.⁠ ⁠Unit Tests
+Create tests/ directory with:
+	∙	test_preprocessing.py: Test audio normalization, resampling functions
+	∙	test_validation.py: Test schema validation logic
+	∙	test_splitting.py: Test stratified split maintains no speaker overlap
+	∙	Use pytest framework
+Folder Structure
+
+iikshana-courtroom-accessibility/
+├── data-pipeline/
+│   ├── dags/
+│   │   ├── data_acquisition_dag.py          # Download datasets
+│   │   ├── preprocessing_dag.py             # Audio preprocessing & splitting
+│   │   ├── validation_dag.py                # Schema & quality checks
+│   │   ├── evaluation_dag.py                # Model evaluation on test sets
+│   │   └── bias_detection_dag.py            # Data slicing & bias analysis
+│   ├── scripts/
+│   │   ├── download_datasets.py
+│   │   ├── preprocess_audio.py
+│   │   ├── stratified_split.py
+│   │   ├── validate_schema.py
+│   │   ├── detect_bias.py
+│   │   └── evaluate_models.py
+│   ├── tests/
+│   │   ├── test_preprocessing.py
+│   │   ├── test_validation.py
+│   │   └── test_splitting.py
+│   ├── data/
+│   │   ├── raw/                             # DVC tracked
+│   │   ├── processed/                       # DVC tracked
+│   │   └── legal_glossary/                  # DVC tracked
+│   ├── logs/
+│   ├── configs/
+│   │   ├── great_expectations/              # Data validation configs
+│   │   └── airflow.cfg
+│   ├── dvc.yaml                             # DVC pipeline definition
+│   ├── dvc.lock
+│   ├── .dvc/
+│   ├── requirements.txt
+│   └── README.md                            # Detailed documentation
+
+
+Key Deliverables Checklist
+✅ 5 Airflow DAGs (acquisition, preprocessing, validation, evaluation, bias detection)✅ DVC configuration tracking all datasets✅ Great Expectations or TFDV setup for schema validation✅ Bias detection report with data slicing results✅ Unit tests for preprocessing & validation functions✅ Logging implemented throughout pipeline✅ Anomaly detection with alert mechanisms✅ Pipeline optimization using Gantt chart analysis✅ README.md with setup instructions, reproducibility steps✅ requirements.txt or environment.yml
+README.md Structure
+Your README should include:
+	1.	Project Overview: Brief description of Iikshana data pipeline
+	2.	Environment Setup:
+	∙	Python version, Airflow installation
+	∙	pip install -r requirements.txt
+	∙	DVC remote setup (GCS or local)
+	3.	Running the Pipeline:
+	∙	airflow dags trigger data_acquisition_dag
+	∙	Order of DAG execution
+	4.	Data Sources: List of datasets with URLs
+	5.	DVC Commands: dvc pull, dvc repro
+	6.	Testing: pytest tests/
+	7.	Folder Structure: Explanation of directories
+	8.	Bias Detection Results: Summary of findings
+	9.	Pipeline Optimization: Bottlenecks identified & resolved
+Implementation Priority
+Since you’re in Phase 3 (Core Audio Pipeline Prototype), start with:
+	1.	Data acquisition DAG (download 2-3 key datasets first: RAVDESS, Common Voice subset)
+	2.	Preprocessing DAG (audio normalization, stratified splitting)
+	3.	DVC setup (track processed datasets)
+	4.	Basic validation (Great Expectations for audio file checks)
+	5.	Unit tests (test preprocessing functions)
+Then expand to bias detection, evaluation, and full monitoring.
