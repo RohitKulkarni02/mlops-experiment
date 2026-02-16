@@ -207,4 +207,9 @@ marimo/_lsp/
 __marimo__/
 
 
-data-pipeline/data/
+# Data (ignore contents; keep folder structure via .gitkeep)
+data-pipeline/data/*
+!data-pipeline/data/.gitkeep
+!data-pipeline/data/raw/
+data-pipeline/data/raw/*
+!data-pipeline/data/raw/.gitkeep

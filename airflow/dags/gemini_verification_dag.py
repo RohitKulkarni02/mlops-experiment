@@ -26,6 +26,7 @@ def _run_gemini_verification(**kwargs):
         raise RuntimeError(
             "Gemini verification failed (exit_code=%s): %s"
             % (result.get("exit_code"), result.get("results", result))
+        )
     return result  # full result (exit_code, results with api_response per file) for logs
 
 

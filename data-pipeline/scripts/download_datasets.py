@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import zipfile
 from pathlib import Path
+from typing import Dict, List, Optional
 
 import requests
 from tqdm import tqdm
@@ -103,7 +104,7 @@ def _download_with_requests(
 def download_file(
     url: str,
     dest: Path,
-    validate_checksum: str | None = None,
+    validate_checksum: Optional[str] = None,
     connect_timeout: int = 30,
     read_timeout: int = 7200,
 ) -> bool:
@@ -137,7 +138,7 @@ def download_file(
     return True
 
 
-def unzip_if_needed(path: Path, out_dir: Path | None = None) -> Path:
+def unzip_if_needed(path: Path, out_dir: Optional[Path] = None) -> Path:
     """Unzip if path is a zip file; return directory containing contents."""
     if not path.suffix.lower() == ".zip":
         return path.parent
@@ -176,7 +177,7 @@ def _download_ravdess(url: str) -> bool:
     return True
 
 
-def download_datasets(datasets: list[str] | None = None) -> dict[str, bool]:
+def download_datasets(datasets: Optional[List[str]] = None) -> Dict[str, bool]:
     """Download configured datasets into data/raw/<name>/."""
     from scripts.utils import CONFIG_DIR
 
@@ -249,6 +250,7 @@ def main() -> None:
     failed = [k for k, v in r.items() if not v]
     if failed:
         logger.warning("Some downloads failed or skipped: %s", failed)
+        sys.exit(1)
     logger.info("Download results: %s", r)
 
 

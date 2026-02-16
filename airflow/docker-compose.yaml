@@ -1,5 +1,5 @@
-# Airflow Docker setup (professor pattern: official style + shared credentials + pipeline mounts)
-# One-time: ./setup.sh
+# Airflow Docker setup (modular: DAGs here, pipeline code in data-pipeline/)
+# One-time: bash setup.sh
 # Start:    docker compose up
 # Stop:     docker compose down
 # See: https://airflow.apache.org/docs/apache-airflow/stable/howto/docker-compose/index.html
@@ -20,11 +20,11 @@ x-airflow-common:
     _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:- pandas numpy scipy soundfile librosa pyyaml great-expectations requests tqdm checksumdir }
   user: "${AIRFLOW_UID:-50000}:0"
   volumes:
-    - ${AIRFLOW_PROJ_DIR:-.}/dags:/opt/airflow/dags
-    - ${AIRFLOW_PROJ_DIR:-.}/scripts:/opt/airflow/scripts
-    - ${AIRFLOW_PROJ_DIR:-.}/config:/opt/airflow/config
-    - ${AIRFLOW_PROJ_DIR:-.}/data:/opt/airflow/data
-    - ${AIRFLOW_PROJ_DIR:-.}/logs:/opt/airflow/logs
+    - ./dags:/opt/airflow/dags
+    - ../data-pipeline/scripts:/opt/airflow/scripts
+    - ../data-pipeline/config:/opt/airflow/config
+    - ../data-pipeline/data:/opt/airflow/data
+    - ../data-pipeline/logs:/opt/airflow/logs
     - airflow-logs:/opt/airflow/airflow_logs
   depends_on:
     &airflow-common-depends-on
@@ -83,11 +83,11 @@ services:
       _AIRFLOW_WWW_USER_USERNAME: ${_AIRFLOW_WWW_USER_USERNAME:-airflow}
       _AIRFLOW_WWW_USER_PASSWORD: ${_AIRFLOW_WWW_USER_PASSWORD:-airflow}
     volumes:
-      - ${AIRFLOW_PROJ_DIR:-.}/dags:/opt/airflow/dags
-      - ${AIRFLOW_PROJ_DIR:-.}/scripts:/opt/airflow/scripts
-      - ${AIRFLOW_PROJ_DIR:-.}/config:/opt/airflow/config
-      - ${AIRFLOW_PROJ_DIR:-.}/data:/opt/airflow/data
-      - ${AIRFLOW_PROJ_DIR:-.}/logs:/opt/airflow/logs
+      - ./dags:/opt/airflow/dags
+      - ../data-pipeline/scripts:/opt/airflow/scripts
+      - ../data-pipeline/config:/opt/airflow/config
+      - ../data-pipeline/data:/opt/airflow/data
+      - ../data-pipeline/logs:/opt/airflow/logs
       - airflow-logs:/opt/airflow/airflow_logs
     user: "${AIRFLOW_UID:-50000}:0"
     depends_on:

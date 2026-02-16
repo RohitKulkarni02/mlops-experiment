@@ -9,12 +9,12 @@ emotion_datasets:
     emotion_classes: 8 # neutral, calm, happy, sad, angry, fearful, disgust, surprised
     format: wav
   IEMOCAP:
-    # USC IEMOCAP — license required; obtain from https://sail.usc.edu/iemocap/
+    # USC IEMOCAP — license/agreement required; request at https://sail.usc.edu/iemocap/
     url: null
     emotion_classes: 5 # neutral, happiness, sadness, anger, frustrated
     format: wav
   CREMA-D:
-    # Crema-D — license required; obtain from https://github.com/CheyneyComputerScience/CREMA-D
+    # CREMA-D — registration required; https://github.com/CheyneyComputerScience/CREMA-D or TFDS/Kaggle
     url: null
     emotion_classes: 6
     format: wav
@@ -24,12 +24,13 @@ emotion_datasets:
     emotion_classes: 7
     format: wav
   TESS:
-    # Toronto Emotional Speech Set — Borealis DOI 10.5683/SP2/E8H2MF or U of T TSpace
-    url: null
+    # Toronto Emotional Speech Set — Borealis (DOI 10.5683/SP2/E8H2MF); direct zip via API
+    url: "https://borealisdata.ca/api/access/dataset/:persistentId/?persistentId=doi:10.5683/SP2/E8H2MF"
+    checksum: null
     emotion_classes: 7
     format: wav
   SAVEE:
-    # Surrey Audio-Visual Expressed Emotion — registration: http://kahlan.eps.surrey.ac.uk/savee/Download.html
+    # Surrey Audio-Visual Expressed Emotion — free but requires registration: http://kahlan.eps.surrey.ac.uk/savee/Download.html
     url: null
     emotion_classes: 7
     format: wav
@@ -42,15 +43,16 @@ emotion_datasets:
 
 multilingual_speech:
   common_voice:
-    # Mozilla Common Voice — use: pip install datasets && load_dataset("mozilla-foundation/common_voice_17_0")
+    # Mozilla Common Voice — per-language downloads at https://commonvoice.mozilla.org/datasets; or use: load_dataset("mozilla-foundation/common_voice_17_0")
     url: null
     format: mp3
   voxpopuli:
-    # VoxPopuli — use Hugging Face datasets or obtain from https://github.com/facebookresearch/voxpopuli
+    # VoxPopuli — Hugging Face: load_dataset("facebook/voxpopuli"); no single-file URL
     url: null
   librispeech:
-    # LibriSpeech — obtain from https://www.openslr.org/12
-    url: null
+    # LibriSpeech (OpenSLR 12) — test-clean subset; full index: https://www.openslr.org/resources/12/
+    url: "https://www.openslr.org/resources/12/test-clean.tar.gz"
+    checksum: null
 
 # Pipeline settings (inference-style: same preprocessing/validation as when sending audio to Gemini/APIs)
 preprocessing:

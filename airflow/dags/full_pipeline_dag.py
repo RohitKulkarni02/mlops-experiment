@@ -33,19 +33,19 @@ with DAG(
     trigger_acquisition = TriggerDagRunOperator(
         task_id="trigger_data_acquisition",
         trigger_dag_id="data_acquisition_dag",
-        wait_for_completion=False,
+        wait_for_completion=True,  # success only after acquisition DAG completes and raw is filled
     )
 
     trigger_preprocessing = TriggerDagRunOperator(
         task_id="trigger_preprocessing",
         trigger_dag_id="preprocessing_dag",
-        wait_for_completion=False,
+        wait_for_completion=True,  # run after acquisition finishes
     )
 
     trigger_validation = TriggerDagRunOperator(
         task_id="trigger_validation",
         trigger_dag_id="validation_dag",
-        wait_for_completion=False,
+        wait_for_completion=True,  # run after preprocessing finishes
     )
 
     trigger_anomaly = TriggerDagRunOperator(

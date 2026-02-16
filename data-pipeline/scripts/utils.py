@@ -5,7 +5,7 @@ import logging
 import os
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 import yaml
 
@@ -19,7 +19,7 @@ LOGS_DIR = PIPELINE_ROOT / "logs"
 CONFIG_DIR = PIPELINE_ROOT / "config"
 
 
-def get_logger(name: str, log_file: str | None = None) -> logging.Logger:
+def get_logger(name: str, log_file: Optional[str] = None) -> logging.Logger:
     """Create a logger that writes to logs/ with timestamps."""
     logger = logging.getLogger(name)
     if logger.handlers:
@@ -43,7 +43,7 @@ def get_logger(name: str, log_file: str | None = None) -> logging.Logger:
     return logger
 
 
-def load_config(filename: str = "datasets.yaml") -> dict[str, Any]:
+def load_config(filename: str = "datasets.yaml") -> dict:
     """Load YAML config from config/."""
     path = CONFIG_DIR / filename
     if not path.exists():

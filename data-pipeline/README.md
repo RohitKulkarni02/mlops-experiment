@@ -37,49 +37,19 @@ source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-### 2. Apache Airflow (optional, for DAGs)
+### 2. Airflow (orchestration)
 
-Install Airflow (if not already in requirements), then run from **step 1.2**:
+DAGs and Docker setup live in the **`airflow/`** directory at the repo root (not inside data-pipeline). The container mounts this directory’s `scripts`, `config`, and `data`.
 
-```bash
-pip install "apache-airflow>=2.7.0"
-# Step 1.2: Create AIRFLOW_HOME, run db migrate, set dags_folder to this repo's dags
-./setup_airflow.sh
-# Step 1.3: Start Airflow (webserver + scheduler)
-./run_airflow.sh
-```
-
-Or manually:
+From the repo root:
 
 ```bash
-export AIRFLOW_HOME="$(pwd)/airflow_home"
-airflow db migrate   # Airflow 3.x; use "airflow db init" on 2.x
-# Edit airflow_home/airflow.cfg: set dags_folder = <absolute_path>/data-pipeline/dags
-airflow standalone
+cd airflow
+bash setup.sh          # one-time: .env + airflow-init
+docker compose up      # start; then http://localhost:8080 (airflow / airflow)
 ```
 
-`setup_airflow.sh` creates `airflow_home/`, runs `airflow db migrate`, and sets `dags_folder` to `data-pipeline/dags` so DAGs can find `scripts/` and `data/`. `airflow_home/` is gitignored.
-
-### 2b. Airflow with Docker (recommended for team)
-
-Same credentials for everyone; no per-machine `simple_auth_manager_passwords.json.generated`. Allocate at least 4GB memory for Docker (ideally 8GB).
-
-1. **One-time setup** (from `data-pipeline/`):
-   ```bash
-   cd data-pipeline
-   bash setup.sh
-   ```
-   This creates `.env` (with `AIRFLOW_UID` and default login `airflow`/`airflow`), required dirs, and runs `docker compose up airflow-init`.
-
-2. **Start Airflow**:
-   ```bash
-   docker compose up
-   ```
-   Wait until you see the webserver health check pass (e.g. `GET /health HTTP/1.1" 200`). Open **http://localhost:8080** and log in with the credentials in `.env` (default: `airflow` / `airflow`).
-
-3. **Stop**: `Ctrl+C`, then `docker compose down`. To reset DB and volumes: `docker compose down -v`.
-
-See `docker-compose.yaml` and `.env.example`. Refs: [Airflow Docker docs](https://airflow.apache.org/docs/apache-airflow/stable/howto/docker-compose/index.html), [Airflow Lab tutorial](https://www.mlwithramin.com/blog/airflow-lab1).
+See **`airflow/README.md`** for details. Allocate at least 4GB memory for Docker (ideally 8GB).
 
 ### 3. DVC (data versioning)
 
@@ -127,6 +97,21 @@ python scripts/anomaly_check.py
 python scripts/legal_glossary_prep.py
 ```
 
+### Data folders and verifying acquisition
+
+- **Data directories** are kept in git via `.gitkeep`:
+  - `data-pipeline/data/.gitkeep`
+  - `data-pipeline/data/raw/.gitkeep`
+- **Raw downloads** (RAVDESS, MELD, EMO-DB, etc.) go into **`data-pipeline/data/raw/`**. When using Airflow (Docker), the container writes to `/opt/airflow/data/raw`, which is mounted from this `data/` folder, so files appear here after **data_acquisition_dag** runs.
+- **To confirm the DAG is working:** After running **data_acquisition_dag** in the Airflow UI, check that `data/raw/` contains files (e.g. `RAVDESS/`, `RAVDESS.zip`, `MELD/`, etc.). In the UI, open the run → **download_datasets** task → **Log** and look for `RAW_DIR=...` and any download or error lines.
+- **To test download without Airflow** (same script the DAG uses):
+  ```bash
+  cd data-pipeline
+  python -m scripts.download_datasets
+  # or: python scripts/download_datasets.py
+  ```
+  Then list raw: `ls -la data/raw/`.
+
 ### With DVC
 
 ```bash
@@ -167,9 +152,7 @@ dvc repro
    ```
 
 6. Use the Airflow UI (Gantt chart) to parallelize independent tasks and optimize bottlenecks (e.g. parallel dataset downloads).
-7. **Gemini verification (optional)**: The pipeline includes an optional stage that sends one or two preprocessed WAVs to the Gemini API to confirm the format is accepted end-to-end. By default it **does not run** (no-op success) so the main pipeline never depends on API keys or network. To enable:
-   - Set env `RUN_GEMINI_VERIFICATION=true` (and `GEMINI_API_KEY` or `GOOGLE_API_KEY`) in your Airflow environment (e.g. in `airflow.cfg` or the task env).
-   - Or run the script manually: `python scripts/verify_gemini_audio.py --force` (with API key set). Install `google-genai` if needed: `pip install google-genai`.
+7. **Gemini verification (optional)**: The pipeline includes an optional stage that sends one or two preprocessed WAVs to the Gemini API to confirm the format is accepted end-to-end. By default it **does not run** (no-op success). To enable: set env `RUN_GEMINI_VERIFICATION=true` and `GEMINI_API_KEY` (or `GOOGLE_API_KEY`) in the Airflow task environment, or run manually: `python scripts/verify_gemini_audio.py --force` from `data-pipeline`.
 8. **Alerts**: When anomalies are detected, `anomaly_detection_dag` fails and Airflow sends an **email** (configure SMTP in `[email]` in `airflow.cfg`). For **Slack**, add an `on_failure_callback` that posts to a Slack webhook (see Airflow docs).
 
 ## Data Sources
@@ -225,18 +208,7 @@ pytest tests/ -v
 
 ```
 data-pipeline/
-├── dags/
-│   ├── data_acquisition_dag.py   # Download datasets
-│   ├── preprocessing_dag.py      # Inference-style preprocessing & evaluation-set split
-│   ├── validation_dag.py         # API-input validation, quality, Great Expectations
-│   ├── gemini_verification_dag.py # Optional: verify preprocessed audio with Gemini API
-│   ├── evaluation_dag.py         # Run APIs on evaluation set (WER, BLEU, F1)
-│   ├── bias_detection_dag.py     # Data slicing (Fairlearn) & bias report
-│   ├── anomaly_detection_dag.py  # Anomaly checks; email alert on failure (PDF §2.8)
-│   └── full_pipeline_dag.py     # Single DAG importing all stages; run full flow in sequence
-├── docker-compose.yaml           # Airflow in Docker (postgres + webserver + scheduler)
-├── setup.sh                      # One-time Docker setup (AIRFLOW_UID, credentials, airflow-init)
-├── .env.example                  # Template for .env (copy and run setup.sh)
+├── dags/                          # DAGs moved to repo root airflow/dags/ (see dags/README.md)
 ├── scripts/
 │   ├── download_datasets.py
 │   ├── preprocess_audio.py
