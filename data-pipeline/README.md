@@ -60,6 +60,27 @@ airflow standalone
 
 `setup_airflow.sh` creates `airflow_home/`, runs `airflow db migrate`, and sets `dags_folder` to `data-pipeline/dags` so DAGs can find `scripts/` and `data/`. `airflow_home/` is gitignored.
 
+### 2b. Airflow with Docker (recommended for team)
+
+Same credentials for everyone; no per-machine `simple_auth_manager_passwords.json.generated`. Allocate at least 4GB memory for Docker (ideally 8GB).
+
+1. **One-time setup** (from `data-pipeline/`):
+   ```bash
+   cd data-pipeline
+   bash setup.sh
+   ```
+   This creates `.env` (with `AIRFLOW_UID` and default login `airflow`/`airflow`), required dirs, and runs `docker compose up airflow-init`.
+
+2. **Start Airflow**:
+   ```bash
+   docker compose up
+   ```
+   Wait until you see the webserver health check pass (e.g. `GET /health HTTP/1.1" 200`). Open **http://localhost:8080** and log in with the credentials in `.env` (default: `airflow` / `airflow`).
+
+3. **Stop**: `Ctrl+C`, then `docker compose down`. To reset DB and volumes: `docker compose down -v`.
+
+See `docker-compose.yaml` and `.env.example`. Refs: [Airflow Docker docs](https://airflow.apache.org/docs/apache-airflow/stable/howto/docker-compose/index.html), [Airflow Lab tutorial](https://www.mlwithramin.com/blog/airflow-lab1).
+
 ### 3. DVC (data versioning)
 
 ```bash
@@ -213,6 +234,9 @@ data-pipeline/
 │   ├── bias_detection_dag.py     # Data slicing (Fairlearn) & bias report
 │   ├── anomaly_detection_dag.py  # Anomaly checks; email alert on failure (PDF §2.8)
 │   └── full_pipeline_dag.py     # Single DAG importing all stages; run full flow in sequence
+├── docker-compose.yaml           # Airflow in Docker (postgres + webserver + scheduler)
+├── setup.sh                      # One-time Docker setup (AIRFLOW_UID, credentials, airflow-init)
+├── .env.example                  # Template for .env (copy and run setup.sh)
 ├── scripts/
 │   ├── download_datasets.py
 │   ├── preprocess_audio.py
