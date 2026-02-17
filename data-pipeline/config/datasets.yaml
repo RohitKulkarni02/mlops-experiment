@@ -62,7 +62,7 @@ preprocessing:
   normalize_loudness: true
   trim_silence: true
   # Set to true to include MELD (.mp4) — requires ffmpeg on PATH
-  include_video: false
+  include_video: true
 
 # Evaluation sets only (no train split): we run APIs on these to measure WER, BLEU, F1
 splits:
