@@ -3,9 +3,15 @@ Evaluation-set split: Dev 20%, Test 70%, Holdout 10% by speaker identity (no ove
 These are evaluation sets only (no train split). We run Gemini/APIs on these sets to measure
 WER, BLEU, F1. Optionally stratify by language, emotion, demographics, audio quality.
 """
+import sys
 import json
 import re
 from pathlib import Path
+
+# Allow running as script from repo root or data-pipeline: ensure pipeline root is on path
+_PIPELINE_ROOT = Path(__file__).resolve().parent.parent
+if str(_PIPELINE_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PIPELINE_ROOT))
 
 from scripts.utils import get_logger, load_config, PROCESSED_DIR
 

@@ -69,10 +69,11 @@ Run stages in order:
 
 ```bash
 cd data-pipeline
-# 1. Download datasets (configure URLs in config/datasets.yaml)
-python scripts/download_datasets.py [RAVDESS MELD ...]
+# 1. Download datasets (configure URLs in config/datasets.yaml). MELD and TESS use Hugging Face (pip install datasets).
+python scripts/download_datasets.py [RAVDESS EMO-DB MELD TESS ...]
 
 # 2. Preprocess (inference-style: same as live API input) and build evaluation sets
+#    To include MELD: set config/datasets.yaml preprocessing.include_video: true and install ffmpeg.
 python scripts/preprocess_audio.py
 python scripts/stratified_split.py
 
@@ -162,8 +163,9 @@ dvc repro
 | RAVDESS        | Emotional speech/song          | Zenodo (see `config/datasets.yaml`) |
 | IEMOCAP        | Multimodal emotions            | License required                     |
 | CREMA-D        | Emotion recognition            | License required                     |
-| MELD           | Multimodal EmotionLines        | GitHub                               |
-| TESS / SAVEE / EMO-DB | Emotion datasets       | Configure in `config/datasets.yaml`  |
+| MELD           | Multimodal EmotionLines        | `download_datasets.py MELD` (Hugging Face; pip install datasets) |
+| TESS           | Toronto Emotional Speech       | `download_datasets.py TESS` (Hugging Face) or [Kaggle](https://www.kaggle.com/datasets/ejlok1/toronto-emotional-speech-set-tess) → extract to `data/raw/TESS/` |
+| SAVEE / EMO-DB | Emotion datasets              | Configure in `config/datasets.yaml`  |
 | Common Voice   | Multilingual speech            | Hugging Face / Mozilla               |
 
 Add or update URLs and checksums in `config/datasets.yaml`.

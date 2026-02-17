@@ -19,14 +19,14 @@ emotion_datasets:
     emotion_classes: 6
     format: wav
   MELD:
-    # Multimodal EmotionLines Dataset (GitHub)
-    url: "https://github.com/declare-lab/MELD/archive/refs/heads/master.zip"
+    # Multimodal EmotionLines Dataset — downloaded via Kaggle (zaber666/meld-dataset) in download_datasets.py; fallback: HF URL
+    url: "https://huggingface.co/datasets/declare-lab/MELD/resolve/main/MELD.Raw.tar.gz"
+    checksum: null
     emotion_classes: 7
     format: wav
   TESS:
-    # Toronto Emotional Speech Set — Borealis (DOI 10.5683/SP2/E8H2MF); direct zip via API
-    url: "https://borealisdata.ca/api/access/dataset/:persistentId/?persistentId=doi:10.5683/SP2/E8H2MF"
-    checksum: null
+    # Toronto Emotional Speech Set — downloaded via Kaggle (kagglehub) in download_datasets.py
+    url: null
     emotion_classes: 7
     format: wav
   SAVEE:
@@ -61,6 +61,8 @@ preprocessing:
   mono: true
   normalize_loudness: true
   trim_silence: true
+  # Set to true to include MELD (.mp4) — requires ffmpeg on PATH
+  include_video: false
 
 # Evaluation sets only (no train split): we run APIs on these to measure WER, BLEU, F1
 splits:
