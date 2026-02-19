@@ -64,6 +64,16 @@ preprocessing:
   # Set to true to include MELD (.mp4) — requires ffmpeg on PATH
   include_video: true
 
+  # Courtroom / noisy-environment robustness (optional). Reduces impact of HVAC, rumble, sudden peaks.
+  # Most of human speech is above 80 Hz, so this removes the low-frequency rumble.
+  courtroom_robust:
+    high_pass_hz: 80       # High-pass cutoff in Hz (removes rumble); 0 = disabled
+    peak_limit_db: -3      # Soft ceiling in dB before loudness norm (stops one loud event dominating); 0 or null = disabled
+    noise_reduction: false # Light stationary noise suppression; set true for noisier environments
+
+  # Set to true to log RSS memory after each step (first file) and every 500 files; helps find OOM cause. Needs psutil in container.
+  log_memory: false
+
 # Evaluation sets only (no train split): we run APIs on these to measure WER, BLEU, F1
 splits:
   dev: 0.20

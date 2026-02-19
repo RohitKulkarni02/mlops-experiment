@@ -33,8 +33,9 @@ def _ensure_scripts_on_path():
     return PIPELINE_ROOT
 
 
-# Same command as: cd data-pipeline && python -m scripts.download_datasets (in container: /opt/airflow)
-DOWNLOAD_CMD = "cd /opt/airflow && PYTHONPATH=/opt/airflow python -m scripts.download_datasets"
+# Same command as: cd data-pipeline && python -m scripts.download_datasets [RAVDESS EMO-DB ...]
+# Exclude MELD (~25-40GB) when disk space is limited; add MELD when you have 50GB+ free.
+DOWNLOAD_CMD = "cd /opt/airflow && PYTHONPATH=/opt/airflow python -m scripts.download_datasets RAVDESS EMO-DB"
 
 
 def _validate_checksums():

@@ -3,11 +3,15 @@ Inference-style audio preprocessing: 16 kHz mono WAV, loudness normalization, si
 Same spec as when sending audio to Gemini/APIs at inference (pipeline and backend use this).
 Reads from data/raw, writes to staging; stratified_split then builds evaluation sets (dev/test/holdout).
 Supports .mp4 (e.g. MELD raw) by extracting audio via ffmpeg.
+
+Optional courtroom-robust steps (config: preprocessing.courtroom_robust): high-pass filter (removes rumble),
+peak limiting (prevents one loud event from dominating), and light stationary noise reduction.
 """
 import sys
 import subprocess
 import tempfile
 from pathlib import Path
+from typing import List, Optional, Tuple, Union
 
 # Allow running as script from repo root or data-pipeline: ensure pipeline root is on path
 _PIPELINE_ROOT = Path(__file__).resolve().parent.parent
@@ -29,8 +33,26 @@ try:
 except ImportError:
     librosa = None  # type: ignore
 
+try:
+    import psutil
+except ImportError:
+    psutil = None  # type: ignore
 
-def _load_audio_from_video(path: Path, sr: int | None = None) -> tuple[np.ndarray, int]:
+# Used only when log_memory is True: which file index we're on (for sampling)
+_memory_log_file_index = 0
+
+
+def _get_rss_mb() -> Optional[float]:
+    """Current process RSS in MB, or None if psutil not available."""
+    if psutil is None:
+        return None
+    try:
+        return psutil.Process().memory_info().rss / (1024 * 1024)
+    except Exception:
+        return None
+
+
+def _load_audio_from_video(path: Path, sr: Optional[int] = None) -> Tuple[np.ndarray, int]:
     """Extract audio from .mp4/.mkv etc. using ffmpeg; return (samples, sample_rate)."""
     path = Path(path).resolve()
     sr = sr or 16000
@@ -62,7 +84,7 @@ def _load_audio_from_video(path: Path, sr: int | None = None) -> tuple[np.ndarra
         wav_path.unlink(missing_ok=True)
 
 
-def load_audio(path: Path, sr: int | None = None) -> tuple[np.ndarray, int]:
+def load_audio(path: Path, sr: Optional[int] = None) -> Tuple[np.ndarray, int]:
     """Load audio; return (samples, sample_rate). Supports .mp4 via ffmpeg; else soundfile then librosa."""
     path = Path(path).resolve()
     suf = path.suffix.lower()
@@ -130,6 +152,86 @@ def trim_silence(data: np.ndarray, sr: int, top_db: float = 25.0) -> np.ndarray:
     return data[idx[0] : idx[-1] + 1].astype(np.float32)
 
 
+# -----------------------------------------------------------------------------
+# Courtroom-robust processing (optional): high-pass, peak limit, noise reduction.
+# Applied after load/mono and before loudness normalization so varying noise
+# (HVAC, rumble, sudden peaks) affects translation/STT less.
+# -----------------------------------------------------------------------------
+
+
+def high_pass_filter(data: np.ndarray, sr: int, cutoff_hz: float) -> np.ndarray:
+    """
+    Remove low-frequency rumble (AC, footsteps, furniture) below cutoff_hz.
+    Speech content is mostly above ~80 Hz; this keeps the signal unchanged above cutoff.
+    Uses a 2nd-order Butterworth high-pass (scipy); no new dependency.
+    """
+    if cutoff_hz <= 0 or data.size == 0:
+        return data
+    from scipy import signal as scipy_signal
+    nyq = sr / 2.0
+    if cutoff_hz >= nyq * 0.9:
+        return data
+    b, a = scipy_signal.butter(2, cutoff_hz / nyq, btype="high")
+    out = scipy_signal.filtfilt(b, a, data.astype(np.float64))
+    return np.asarray(out, dtype=np.float32)
+
+
+def peak_limit(data: np.ndarray, limit_db: float) -> np.ndarray:
+    """
+    Soft ceiling so a single loud event (door slam, objection) does not dominate.
+    Values beyond 10^(limit_db/20) are clipped; applied before loudness normalization.
+    """
+    if limit_db >= 0 or data.size == 0:
+        return data
+    ceiling = 10.0 ** (limit_db / 20.0)
+    return np.clip(data, -ceiling, ceiling).astype(np.float32)
+
+
+def reduce_noise_stationary(data: np.ndarray, sr: int) -> np.ndarray:
+    """
+    Light stationary noise suppression via spectral subtraction.
+    Estimates noise from the first 0.5 s (or start of file), then subtracts it
+    from the magnitude spectrum per frame, with a floor to avoid over-suppression.
+    Helps with constant HVAC/hum in courtroom; no extra dependency (numpy/scipy).
+    """
+    if data.size == 0:
+        return data
+    from scipy import signal as scipy_signal
+    frame_len = 512
+    hop_len = frame_len // 2
+    n_fft = frame_len
+    # Noise: first 0.5 s or 20 frames, whichever is smaller
+    noise_frames = min(20, max(1, int(0.5 * sr) // hop_len))
+    num_frames = (len(data) - frame_len) // hop_len + 1
+    if num_frames < 2 or noise_frames >= num_frames:
+        return data
+    window = scipy_signal.windows.hann(frame_len)
+    # Build noise magnitude spectrum (average of first few frames)
+    noise_fft = np.zeros(n_fft // 2 + 1, dtype=np.float64)
+    for i in range(noise_frames):
+        start = i * hop_len
+        frame = data[start : start + frame_len].astype(np.float64) * window
+        spec = np.abs(np.fft.rfft(frame))
+        noise_fft += spec
+    noise_fft /= noise_frames
+    # Floor: don't subtract below 0.02 * noise (avoids musical noise)
+    noise_fft = np.maximum(noise_fft, 1e-10)
+    floor = 0.02 * noise_fft
+    # Process each frame: magnitude subtract with floor, keep phase; overlap-add with Hann (50% hop)
+    out = np.zeros_like(data, dtype=np.float64)
+    for i in range(num_frames):
+        start = i * hop_len
+        frame = data[start : start + frame_len].astype(np.float64) * window
+        fft = np.fft.rfft(frame)
+        mag = np.abs(fft)
+        phase = np.angle(fft)
+        mag_clean = np.maximum(mag - noise_fft, floor)
+        out[start : start + frame_len] += np.fft.irfft(mag_clean * np.exp(1j * phase), n=frame_len) * window
+    # Hann 50% overlap: sum of overlapping windows = 0.5, so scale by 2 to restore level
+    out = (out * 2.0).astype(np.float32)
+    return out
+
+
 def process_one(
     in_path: Path,
     out_path: Path,
@@ -137,16 +239,54 @@ def process_one(
     mono: bool = True,
     normalize: bool = True,
     trim: bool = True,
+    # Courtroom-robust options (from config preprocessing.courtroom_robust); 0/None/False = off
+    high_pass_hz: float = 0,
+    peak_limit_db: Optional[float] = None,
+    noise_reduction: bool = False,
+    log_memory: bool = False,
 ) -> bool:
-    """Convert one file to target format and save."""
+    """
+    Convert one file to target format and save.
+    Pipeline order: load -> mono -> [high_pass -> noise_reduction -> peak_limit] -> normalize -> trim -> WAV.
+    """
+    global _memory_log_file_index
+    idx = _memory_log_file_index
+    _memory_log_file_index += 1
     try:
+        # Optional memory profiling: log RSS to find which step causes OOM (set preprocessing.log_memory: true)
+        def _mem_log(step: str) -> None:
+            if not log_memory:
+                return
+            rss = _get_rss_mb()
+            if rss is None:
+                return
+            # First file: log after every step. Every 500 files: log only at start to see growth.
+            if idx == 0:
+                logger.info("memory [file_index=0] after %s: %.1f MB", step, rss)
+            elif step == "start" and idx % 500 == 0:
+                logger.info("memory [file_index=%d] after start: %.1f MB", idx, rss)
+
+        _mem_log("start")
         data, sr = load_audio(in_path, sr=target_sr)
+        _mem_log("load_audio")
         if mono and data.ndim > 1:
             data = data.mean(axis=1)
+        # Optional courtroom-robust steps (before loudness so noise/peaks don't skew normalization)
+        if high_pass_hz > 0:
+            data = high_pass_filter(data, sr, high_pass_hz)
+            _mem_log("high_pass_filter")
+        if noise_reduction:
+            data = reduce_noise_stationary(data, sr)
+            _mem_log("reduce_noise_stationary")
+        if peak_limit_db is not None and peak_limit_db < 0:
+            data = peak_limit(data, peak_limit_db)
+            _mem_log("peak_limit")
         if normalize:
             data = normalize_loudness(data)
+            _mem_log("normalize_loudness")
         if trim:
             data = trim_silence(data, sr)
+            _mem_log("trim_silence")
         out_path.parent.mkdir(parents=True, exist_ok=True)
         sf.write(out_path, data, sr, subtype="PCM_16")
         return True
@@ -174,7 +314,7 @@ def process_one(
         return False
 
 
-def collect_audio_files(root: Path, exts: tuple[str, ...] = (".wav", ".mp3", ".flac", ".ogg", ".m4a")) -> list[Path]:
+def collect_audio_files(root: Path, exts: Tuple[str, ...] = (".wav", ".mp3", ".flac", ".ogg", ".m4a")) -> List[Path]:
     """Collect audio files under root. MELD (.mp4) is skipped by default; add .mp4 to exts if ffmpeg is available.
     Skips macOS resource-fork files (._*) which are not real media."""
     root = Path(root).resolve()
@@ -188,9 +328,9 @@ def collect_audio_files(root: Path, exts: tuple[str, ...] = (".wav", ".mp3", ".f
 
 
 def run_preprocessing(
-    raw_subdir: str | Path | None = None,
-    out_subdir: Path | None = None,
-) -> tuple[int, int]:
+    raw_subdir: Optional[Union[str, Path]] = None,
+    out_subdir: Optional[Path] = None,
+) -> Tuple[int, int]:
     """Run preprocessing on raw data. Returns (success_count, fail_count)."""
     cfg = load_config()
     preproc = cfg.get("preprocessing", {})
@@ -199,6 +339,13 @@ def run_preprocessing(
     normalize = preproc.get("normalize_loudness", True)
     trim = preproc.get("trim_silence", True)
     include_video = preproc.get("include_video", False)
+    # Courtroom-robust options (optional); all off if courtroom_robust block is missing
+    court = preproc.get("courtroom_robust", {})
+    high_pass_hz = float(court.get("high_pass_hz", 0) or 0)
+    peak_limit_db = court.get("peak_limit_db")
+    if peak_limit_db is not None:
+        peak_limit_db = float(peak_limit_db)
+    noise_reduction = bool(court.get("noise_reduction", False))
     exts = (".wav", ".mp3", ".flac", ".ogg", ".m4a")
     if include_video:
         exts = exts + (".mp4", ".m4v", ".mkv", ".avi", ".mov")
@@ -229,6 +376,18 @@ def run_preprocessing(
     except Exception:
         pass
     logger.info("Found %d audio files under %s", len(files), raw_root)
+    if high_pass_hz > 0 or peak_limit_db is not None or noise_reduction:
+        logger.info(
+            "Courtroom-robust: high_pass_hz=%s, peak_limit_db=%s, noise_reduction=%s",
+            high_pass_hz or "off",
+            peak_limit_db if peak_limit_db is not None else "off",
+            noise_reduction,
+        )
+    log_memory = bool(preproc.get("log_memory", False))
+    if log_memory:
+        logger.info("Memory logging enabled (preprocessing.log_memory=true); install psutil for RSS stats")
+    global _memory_log_file_index
+    _memory_log_file_index = 0
     ok, fail = 0, 0
     total = len(files)
     ffmpeg_warned = False
@@ -239,7 +398,18 @@ def run_preprocessing(
         rel = fp.relative_to(raw_root)
         out_path = out_subdir / rel.with_suffix(".wav")
         try:
-            if process_one(fp, out_path, target_sr=target_sr, mono=mono, normalize=normalize, trim=trim):
+            if process_one(
+                fp,
+                out_path,
+                target_sr=target_sr,
+                mono=mono,
+                normalize=normalize,
+                trim=trim,
+                high_pass_hz=high_pass_hz,
+                peak_limit_db=peak_limit_db,
+                noise_reduction=noise_reduction,
+                log_memory=log_memory,
+            ):
                 ok += 1
             else:
                 fail += 1

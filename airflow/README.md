@@ -8,7 +8,7 @@ From this directory (`airflow/`):
 
 ```bash
 bash setup.sh          # one-time: .env + airflow-init
-docker compose up      # start; then http://localhost:8080 (airflow / airflow)
+docker compose up      # start; then http://localhost:8081 (airflow / airflow)
 ```
 
 Stop: `Ctrl+C`, then `docker compose down`. Reset DB: `docker compose down -v`.
