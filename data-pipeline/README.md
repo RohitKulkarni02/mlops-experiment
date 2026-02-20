@@ -1,6 +1,5 @@
 # Iikshana Data Pipeline
 
-<<<<<<< HEAD
 Data pipeline for the Iikshana ADA-compliant courtroom visual aid system: data acquisition, preprocessing, validation, bias detection, and model evaluation (WER, BLEU, F1). Built with **Apache Airflow**, **DVC**, and **Great Expectations**-style validation.
 
 ## Project Overview
@@ -12,29 +11,6 @@ This pipeline supports evaluation of pre-trained models (e.g. Google Gemini 2.0 
 - **Validation**: Schema checks (sample rate, duration, format), emotion label validation, quality reports.
 - **Bias detection**: Slicing by demographics, emotion, language, audio quality; disparity reports and mitigation notes.
 - **Evaluation**: STT (Chirp 3), translation, emotion detection → WER, BLEU, F1 vs targets (WER < 10%, BLEU > 0.40, F1 > 0.70).
-=======
-Data pipeline for the Iikshana ADA-compliant courtroom visual aid system: data acquisition, **inference-style preprocessing**, **API-input validation**, bias detection, and **API evaluation** (WER, BLEU, F1). Built with **Apache Airflow**, **DVC**, and **Great Expectations**-style validation.
-
-## Pipeline principles (inference-first)
-
-This pipeline is **inference- and API-oriented**, not training-oriented. We **do not train models**. All stages align with how we send data to **Gemini and other APIs** in production:
-
-- **Preprocessing** = exactly what we do before calling Gemini/APIs at inference (16 kHz mono, normalize, trim). Same spec for pipeline batches and for live backend input.
-- **Validation** = API-input quality: format, sample rate, duration. Same checks for evaluation data and for live inference.
-- **Splits (dev / test / holdout)** = **evaluation sets** only. We run Gemini/APIs on these sets to measure quality (WER, BLEU, F1). No train split.
-- **Evaluation** = run APIs (STT, translation, emotion) on the evaluation set and compare to targets.
-
-One preprocessing path, one validation contract, evaluation = API runs on evaluation sets.
-
-## Project Overview
-
-- **Data acquisition**: Download RAVDESS, IEMOCAP, CREMA-D, MELD, TESS, SAVEE, EMO-DB, Common Voice, etc.
-- **Preprocessing (inference-style)**: 16 kHz mono WAV, loudness normalization, silence trimming — same as live input to APIs. Then stratified **evaluation sets** (dev 20%, test 70%, holdout 10%) with no speaker overlap.
-- **Validation (API-input)**: Schema checks (sample rate, duration, format), emotion labels; ensures audio is valid for API consumption.
-- **Gemini verification (optional)**: Smoke test that pipeline output is accepted by the Gemini API (one or a few WAVs). Skippable via `RUN_GEMINI_VERIFICATION=false`; when enabled, proves end-to-end compatibility.
-- **Bias detection**: Slicing by demographics, emotion, language, audio quality; disparity reports and mitigation notes.
-- **Evaluation**: Run STT (Chirp 3), translation, emotion detection via APIs on evaluation set → WER, BLEU, F1 vs targets (WER < 10%, BLEU > 0.40, F1 > 0.70).
->>>>>>> origin/data_preprocessing
 - **Anomaly detection**: Missing/corrupt files, duration distribution, label imbalance; optional alerts.
 
 ## Environment Setup
@@ -51,7 +27,6 @@ source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-<<<<<<< HEAD
 ### 2. Apache Airflow (optional, for DAGs)
 
 ```bash
@@ -62,21 +37,6 @@ airflow standalone   # or configure a scheduler + webserver
 ```
 
 Point Airflow’s `dags_folder` to this repo’s `data-pipeline/dags` (or copy/symlink the `dags` folder into `AIRFLOW_HOME/dags`).
-=======
-### 2. Airflow (orchestration)
-
-DAGs and Docker setup live in the **`airflow/`** directory at the repo root (not inside data-pipeline). The container mounts this directory’s `scripts`, `config`, and `data`.
-
-From the repo root:
-
-```bash
-cd airflow
-bash setup.sh          # one-time: .env + airflow-init
-docker compose up      # start; then http://localhost:8080 (airflow / airflow)
-```
-
-See **`airflow/README.md`** for details. Allocate at least 4GB memory for Docker (ideally 8GB).
->>>>>>> origin/data_preprocessing
 
 ### 3. DVC (data versioning)
 
@@ -96,7 +56,6 @@ Run stages in order:
 
 ```bash
 cd data-pipeline
-<<<<<<< HEAD
 # 1. Download datasets (configure URLs in config/datasets.yaml)
 python scripts/download_datasets.py [RAVDESS MELD ...]
 
@@ -114,55 +73,12 @@ python scripts/detect_bias.py
 python scripts/evaluate_models.py
 
 # 6. Anomaly check
-=======
-# 1. Download datasets (configure URLs in config/datasets.yaml). MELD and TESS use Hugging Face (pip install datasets).
-python scripts/download_datasets.py [RAVDESS EMO-DB MELD TESS ...]
-
-# 2. Preprocess (inference-style: same as live API input) and build evaluation sets
-#    To include MELD: set config/datasets.yaml preprocessing.include_video: true and install ffmpeg.
-python scripts/preprocess_audio.py
-python scripts/stratified_split.py
-
-# 3. Validate (API-input: schema + quality report, then Great Expectations + statistics)
-python scripts/validate_schema.py
-python scripts/run_great_expectations.py
-
-# 3b. Gemini verification (optional: spot-check that preprocessed WAVs work with Gemini API)
-#     Set GEMINI_API_KEY or GOOGLE_API_KEY; use --force to run without RUN_GEMINI_VERIFICATION.
-python scripts/verify_gemini_audio.py [data/processed] [--max-files 2] [--force]
-
-# 4. Bias report (uses Fairlearn for per-group slicing)
-python scripts/detect_bias.py
-
-# 5. Evaluation (run APIs on evaluation set; placeholder metrics if live APIs disabled)
-python scripts/evaluate_models.py
-
-# 6. Anomaly check (fails on anomalies; use anomaly_detection_dag for email alert)
->>>>>>> origin/data_preprocessing
 python scripts/anomaly_check.py
 
 # 7. Legal glossary (from repo data/legal_glossary)
 python scripts/legal_glossary_prep.py
 ```
 
-<<<<<<< HEAD
-=======
-### Data folders and verifying acquisition
-
-- **Data directories** are kept in git via `.gitkeep`:
-  - `data-pipeline/data/.gitkeep`
-  - `data-pipeline/data/raw/.gitkeep`
-- **Raw downloads** (RAVDESS, MELD, EMO-DB, etc.) go into **`data-pipeline/data/raw/`**. When using Airflow (Docker), the container writes to `/opt/airflow/data/raw`, which is mounted from this `data/` folder, so files appear here after **data_acquisition_dag** runs.
-- **To confirm the DAG is working:** After running **data_acquisition_dag** in the Airflow UI, check that `data/raw/` contains files (e.g. `RAVDESS/`, `RAVDESS.zip`, `MELD/`, etc.). In the UI, open the run → **download_datasets** task → **Log** and look for `RAW_DIR=...` and any download or error lines.
-- **To test download without Airflow** (same script the DAG uses):
-  ```bash
-  cd data-pipeline
-  python -m scripts.download_datasets
-  # or: python scripts/download_datasets.py
-  ```
-  Then list raw: `ls -la data/raw/`.
-
->>>>>>> origin/data_preprocessing
 ### With DVC
 
 ```bash
@@ -172,53 +88,18 @@ dvc repro
 
 ### With Airflow
 
-<<<<<<< HEAD
 1. Ensure `data-pipeline` (or its `dags` folder) is in Airflow’s `dags_folder` and that the pipeline root is on `PYTHONPATH` when tasks run (or run tasks from `data-pipeline` as cwd).
 2. Trigger DAGs in order (acquisition → preprocessing → validation; bias and evaluation can run after preprocessing):
 
-=======
-1. **Start Airflow from this project** so the UI uses this repo’s DAGs:
-   ```bash
-   cd data-pipeline
-   ./run_airflow.sh
-   ```
-   Or manually: `export AIRFLOW_HOME="$(pwd)/airflow_home"` then `airflow standalone`. If you start Airflow from elsewhere or without `AIRFLOW_HOME`, the UI will use a different `dags_folder` and **full_pipeline_dag will not appear**.
-2. In the UI, open the **DAGs** tab (main nav). Search for `full` or `pipeline` if the list is long. Unpause the DAG with the toggle if needed.
-3. To confirm Airflow can see the DAG: from `data-pipeline` run `./check_dags.sh`. **If the CLI shows `full_pipeline_dag` but the UI does not**, the browser is almost certainly connected to a *different* Airflow (e.g. one started without `AIRFLOW_HOME` or from another directory). **Fix:** stop any other Airflow (close other terminals running `airflow standalone` or `airflow webserver`), then from `data-pipeline` run `./run_airflow.sh` and open http://localhost:8080 → click **DAGs** in the top nav (not Home) → search for `full` or `pipeline`.
-4. Ensure `dags_folder` in `airflow_home/airflow.cfg` points to this repo’s `data-pipeline/dags` (done by `./setup_airflow.sh`).
-5. **Single flow (recommended):** Trigger the full pipeline DAG to run all stages in sequence:
-   ```bash
-   export AIRFLOW_HOME="$(pwd)/airflow_home"
-   airflow dags trigger full_pipeline_dag
-   ```
-   If tasks fail in the UI with **empty logs** (Airflow 3 executor/scheduler issue), run the DAG in-process to see output and trigger the stage DAGs:
-   ```bash
-   export AIRFLOW_HOME="$(pwd)/airflow_home"
-   airflow dags test full_pipeline_dag 2025-01-01
-   ```
-   Or trigger each stage DAG individually (modular):
->>>>>>> origin/data_preprocessing
    ```bash
    airflow dags trigger data_acquisition_dag
    airflow dags trigger preprocessing_dag
    airflow dags trigger validation_dag
-<<<<<<< HEAD
    airflow dags trigger bias_detection_dag
    airflow dags trigger evaluation_dag
    ```
 
 3. Use the Airflow UI (Gantt chart) to parallelize independent tasks and optimize bottlenecks (e.g. parallel dataset downloads).
-=======
-   airflow dags trigger gemini_verification_dag   # optional; set RUN_GEMINI_VERIFICATION=true to run check
-   airflow dags trigger bias_detection_dag
-   airflow dags trigger evaluation_dag
-   airflow dags trigger anomaly_detection_dag
-   ```
-
-6. Use the Airflow UI (Gantt chart) to parallelize independent tasks and optimize bottlenecks (e.g. parallel dataset downloads).
-7. **Gemini verification (optional)**: The pipeline includes an optional stage that sends one or two preprocessed WAVs to the Gemini API to confirm the format is accepted end-to-end. By default it **does not run** (no-op success). To enable: set env `RUN_GEMINI_VERIFICATION=true` and `GEMINI_API_KEY` (or `GOOGLE_API_KEY`) in the Airflow task environment, or run manually: `python scripts/verify_gemini_audio.py --force` from `data-pipeline`.
-8. **Alerts**: When anomalies are detected, `anomaly_detection_dag` fails and Airflow sends an **email** (configure SMTP in `[email]` in `airflow.cfg`). For **Slack**, add an `on_failure_callback` that posts to a Slack webhook (see Airflow docs).
->>>>>>> origin/data_preprocessing
 
 ## Data Sources
 
@@ -227,14 +108,8 @@ dvc repro
 | RAVDESS        | Emotional speech/song          | Zenodo (see `config/datasets.yaml`) |
 | IEMOCAP        | Multimodal emotions            | License required                     |
 | CREMA-D        | Emotion recognition            | License required                     |
-<<<<<<< HEAD
 | MELD           | Multimodal EmotionLines        | GitHub                               |
 | TESS / SAVEE / EMO-DB | Emotion datasets       | Configure in `config/datasets.yaml`  |
-=======
-| MELD           | Multimodal EmotionLines        | `download_datasets.py MELD` (Hugging Face; pip install datasets) |
-| TESS           | Toronto Emotional Speech       | `download_datasets.py TESS` (Hugging Face) or [Kaggle](https://www.kaggle.com/datasets/ejlok1/toronto-emotional-speech-set-tess) → extract to `data/raw/TESS/` |
-| SAVEE / EMO-DB | Emotion datasets              | Configure in `config/datasets.yaml`  |
->>>>>>> origin/data_preprocessing
 | Common Voice   | Multilingual speech            | Hugging Face / Mozilla               |
 
 Add or update URLs and checksums in `config/datasets.yaml`.
@@ -245,11 +120,7 @@ Add or update URLs and checksums in `config/datasets.yaml`.
 
   ```bash
   dvc add data/raw/RAVDESS data/raw/IEMOCAP
-<<<<<<< HEAD
   dvc add data/processed/dev data/processed/test data/processed/holdout
-=======
-  dvc add data/processed/dev data/processed/test data/processed/holdout   # evaluation sets
->>>>>>> origin/data_preprocessing
   dvc add data/legal_glossary
   git add *.dvc .gitignore
   git commit -m "Track pipeline data with DVC"
@@ -283,28 +154,18 @@ pytest tests/ -v
 
 ```
 data-pipeline/
-<<<<<<< HEAD
 ├── dags/
 │   ├── data_acquisition_dag.py   # Download datasets
 │   ├── preprocessing_dag.py      # Audio preprocessing & stratified split
 │   ├── validation_dag.py         # Schema & quality checks
 │   ├── evaluation_dag.py         # Model evaluation (WER, BLEU, F1)
 │   └── bias_detection_dag.py     # Data slicing & bias report
-=======
-├── dags/                          # DAGs moved to repo root airflow/dags/ (see dags/README.md)
->>>>>>> origin/data_preprocessing
 ├── scripts/
 │   ├── download_datasets.py
 │   ├── preprocess_audio.py
 │   ├── stratified_split.py
 │   ├── validate_schema.py
-<<<<<<< HEAD
 │   ├── detect_bias.py
-=======
-│   ├── run_great_expectations.py   # Schema + statistics (PDF §2.7)
-│   ├── verify_gemini_audio.py     # Optional: Gemini API spot-check (Option A/B)
-│   ├── detect_bias.py              # Uses Fairlearn (PDF §3.2)
->>>>>>> origin/data_preprocessing
 │   ├── evaluate_models.py
 │   ├── legal_glossary_prep.py
 │   ├── anomaly_check.py
@@ -315,11 +176,7 @@ data-pipeline/
 │   └── test_splitting.py
 ├── data/
 │   ├── raw/              # DVC tracked
-<<<<<<< HEAD
 │   ├── processed/        # dev, test, holdout, reports (DVC tracked)
-=======
-│   ├── processed/        # evaluation sets (dev, test, holdout) + reports (DVC tracked)
->>>>>>> origin/data_preprocessing
 │   └── legal_glossary/   # DVC tracked
 ├── config/
 │   └── datasets.yaml
@@ -336,46 +193,9 @@ The bias detection step (`scripts/detect_bias.py`, `bias_detection_dag`) produce
 - Counts per emotion and per speaker.
 - Disparities (e.g. strong class imbalance).
 - Recommendations: stratified evaluation, confidence thresholding, re-sampling.
-<<<<<<< HEAD
 
 Summarize any findings (e.g. “Female voices in TESS show X% better emotion detection than male in SAVEE”) in this section after running on your data.
 
-=======
-- **Fairlearn** (PDF §3.2): per-group metrics via `MetricFrame`; see `fairlearn_by_group` in the report.
-
-Summarize any findings (e.g. “Female voices in TESS show X% better emotion detection than male in SAVEE”) in this section after running on your data.
-
----
-
-## Bias Detection and Mitigation Process (PDF §3.4)
-
-This section documents the steps we take to detect and mitigate bias, the types of bias we look for, how we address them, and any trade-offs.
-
-### 1. Steps to detect bias
-
-1. **Data slicing**: We slice the processed dataset by **sensitive features** (emotion label, speaker identity as a proxy for demographics). Slicing is implemented using **Fairlearn**’s `MetricFrame` (PDF §3.2) so that metrics (e.g. sample count) are computed per subgroup.
-2. **Disparity detection**: We compare counts per slice to an expected balanced proportion (e.g. equal share per emotion). Any slice that deviates beyond a threshold (e.g. &gt;50% above/below expected) is flagged as a disparity in `bias_report.json`.
-3. **Report generation**: The pipeline writes `data/processed/bias_report.json` with `by_emotion`, `by_speaker_count`, `fairlearn_by_group`, `disparities`, and `recommendations`.
-
-### 2. Types of bias we look for
-
-- **Emotion-class imbalance**: Some emotions (e.g. “neutral”, “happy”) may have many more samples than others (e.g. “disgust”), which can skew evaluation and deployment.
-- **Speaker/demographic skew**: When speaker_id is correlated with demographics (e.g. gender or accent in CREMA-D), uneven representation across speakers can lead to worse performance for under-represented groups.
-- **Split imbalance**: Evaluation sets (dev/test/holdout) may have different label or speaker distributions; we check that splits are stratified by speaker (no overlap) and report per-split counts.
-
-### 3. How we address bias (mitigation)
-
-- **Re-sampling**: We recommend re-sampling under-represented emotion classes or speakers when calibrating or evaluating APIs (documented in `recommendations` in the report).
-- **Stratified evaluation**: We use stratified evaluation sets (by speaker) and recommend reporting metrics **per slice** (e.g. per emotion, per speaker group) so that API performance gaps are visible.
-- **Confidence thresholding**: For deployment, we recommend confidence thresholding or calibration for under-represented classes to reduce disparate impact.
-
-### 4. Trade-offs
-
-- **Re-sampling** can improve balance but may over-represent rare classes and slightly change the effective distribution; we use it only where imbalance exceeds our threshold.
-- **Stratified evaluation** adds reporting overhead but surfaces API performance gaps that need to be addressed by data collection, re-sampling, or API/prompt design.
-- **Confidence thresholding** may reduce overall accuracy slightly in exchange for more equitable performance across groups; the exact thresholds should be tuned on holdout data.
-
->>>>>>> origin/data_preprocessing
 ## Pipeline Optimization
 
 - **Bottlenecks**: Use Airflow’s Gantt chart to find long-running tasks (e.g. large dataset downloads). Parallelize independent downloads in the acquisition DAG.

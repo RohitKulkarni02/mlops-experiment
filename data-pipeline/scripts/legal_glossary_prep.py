@@ -4,14 +4,13 @@ Expects source glossary (e.g. from repo data/legal_glossary/legal_terms.json); w
 """
 import json
 from pathlib import Path
-from typing import List, Optional
 
 from scripts.utils import get_logger, load_config, LEGAL_GLOSSARY_DIR, PIPELINE_ROOT
 
 logger = get_logger("legal_glossary_prep")
 
 
-def load_glossary(path: Optional[Path] = None) -> List[dict]:
+def load_glossary(path: Path | None = None) -> list[dict]:
     """Load legal terms from JSON. Accepts repo root data/legal_glossary or pipeline data/legal_glossary."""
     if path is None:
         for base in (LEGAL_GLOSSARY_DIR, PIPELINE_ROOT.parent / "data" / "legal_glossary"):
@@ -29,8 +28,8 @@ def load_glossary(path: Optional[Path] = None) -> List[dict]:
 
 
 def run_glossary_prep(
-    source_path: Optional[Path] = None,
-    out_dir: Optional[Path] = None,
+    source_path: Path | None = None,
+    out_dir: Path | None = None,
 ) -> int:
     """Normalize and write glossary for translation validation; return term count."""
     terms = load_glossary(source_path)

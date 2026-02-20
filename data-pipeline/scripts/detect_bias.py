@@ -4,14 +4,13 @@ Compute metrics per slice and document disparities. Output report for mitigation
 """
 import json
 from pathlib import Path
-from typing import Dict, List, Optional
 
 from scripts.utils import get_logger, load_config, PROCESSED_DIR
 
 logger = get_logger("detect_bias")
 
 
-def load_manifests(data_dir: Path) -> List[dict]:
+def load_manifests(data_dir: Path) -> list[dict]:
     """Load all manifest.json entries from dev/test/holdout."""
     entries = []
     for split in ("dev", "test", "holdout"):
@@ -26,32 +25,32 @@ def load_manifests(data_dir: Path) -> List[dict]:
     return entries
 
 
-def slice_by_emotion(entries: List[dict]) -> Dict[str, List[dict]]:
+def slice_by_emotion(entries: list[dict]) -> dict[str, list[dict]]:
     """Slice by emotion label."""
-    by_emotion: Dict[str, List[dict]] = {}
+    by_emotion: dict[str, list[dict]] = {}
     for e in entries:
         label = e.get("emotion") or e.get("label") or "unknown"
         by_emotion.setdefault(label, []).append(e)
     return by_emotion
 
 
-def slice_by_speaker(entries: List[dict]) -> Dict[str, List[dict]]:
+def slice_by_speaker(entries: list[dict]) -> dict[str, list[dict]]:
     """Slice by speaker_id (proxy for demographics when no explicit gender/accent)."""
-    by_speaker: Dict[str, List[dict]] = {}
+    by_speaker: dict[str, list[dict]] = {}
     for e in entries:
         sid = e.get("speaker_id", "unknown")
         by_speaker.setdefault(sid, []).append(e)
     return by_speaker
 
 
-def compute_counts_per_slice(slices: Dict[str, List[dict]]) -> Dict[str, int]:
+def compute_counts_per_slice(slices: dict[str, list[dict]]) -> dict[str, int]:
     """Return count per slice for imbalance check."""
     return {k: len(v) for k, v in slices.items()}
 
 
 def run_bias_analysis(
-    data_dir: Optional[Path] = None,
-    report_path: Optional[Path] = None,
+    data_dir: Path | None = None,
+    report_path: Path | None = None,
 ) -> dict:
     """Run slicing, compute counts, and write bias report."""
     if data_dir is None:

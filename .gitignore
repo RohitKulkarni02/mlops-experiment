@@ -205,17 +205,3 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
-# Data (ignore contents; keep folder structure via .gitkeep)
-data-pipeline/data/*
-!data-pipeline/data/.gitkeep
-!data-pipeline/data/raw/
-data-pipeline/data/raw/*
-!data-pipeline/data/raw/.gitkeep
-
-data-pipeline/logs/
-data-pipeline/airflow_home/
-airflow/
-data-pipeline/plugins/
-data-pipeline/.env
-.DS_Store
-data-pipeline/.DS_Store

@@ -5,7 +5,6 @@ This script provides the structure and offline-compatible placeholders when APIs
 """
 import json
 from pathlib import Path
-from typing import List, Optional
 
 from scripts.utils import get_logger, load_config, PROCESSED_DIR
 
@@ -17,7 +16,7 @@ TARGET_BLEU = 0.40
 TARGET_F1 = 0.70
 
 
-def load_test_manifest(data_dir: Path) -> List[dict]:
+def load_test_manifest(data_dir: Path) -> list[dict]:
     """Load test split manifest."""
     manifest_path = data_dir / "test" / "manifest.json"
     if not manifest_path.exists():
@@ -79,8 +78,8 @@ def compute_f1_per_class(tp: int, fp: int, fn: int) -> float:
 
 
 def run_evaluation(
-    data_dir: Optional[Path] = None,
-    metrics_path: Optional[Path] = None,
+    data_dir: Path | None = None,
+    metrics_path: Path | None = None,
     use_live_apis: bool = False,
 ) -> dict:
     """
