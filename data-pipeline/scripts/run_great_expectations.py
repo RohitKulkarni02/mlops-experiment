@@ -94,29 +94,48 @@ def run_ge_validation_and_statistics(
 
     if gx is not None:
         try:
-            context = gx.get_context()
-            # Per GE 0.18: read_dataframe returns a Validator
-            validator = context.sources.add_pandas(name="processed_data").read_dataframe(
-                df, asset_name="processed_frame", batch_metadata={"source": "quality_report"}
-            )
-            # Schema and quality expectations (per PDF §2.7: validate schema and quality over time)
-            validator.expect_column_to_exist("duration_sec")
-            validator.expect_column_to_exist("sample_rate")
-            validator.expect_column_to_exist("channels")
-            validator.expect_column_values_to_be_between("duration_sec", min_value=min_dur, max_value=max_dur)
-            validator.expect_column_values_to_be_between("sample_rate", min_value=8000, max_value=48000)
-            validator.expect_column_values_to_be_in_set("channels", value_set=[1, 2])
+            context = gx.get_context(mode="ephemeral")
+            # Data source -> dataframe asset -> batch definition (GE v1 API)
+            data_source = context.data_sources.add_pandas(name="processed_data")
+            data_asset = data_source.add_dataframe_asset(name="processed_frame")
+            batch_definition = data_asset.add_batch_definition_whole_dataframe("processed_batch")
+            batch_parameters = {"dataframe": df}
 
-            validator.save_expectation_suite()
-            checkpoint = context.add_or_update_checkpoint(
-                name="processed_data_checkpoint", validator=validator
+            # Expectation suite with same expectations: duration_sec, sample_rate, channels
+            suite = gx.ExpectationSuite(name="processed_suite")
+            suite = context.suites.add(suite)
+            suite.add_expectation(gx.expectations.ExpectColumnToExist(column="duration_sec"))
+            suite.add_expectation(gx.expectations.ExpectColumnToExist(column="sample_rate"))
+            suite.add_expectation(gx.expectations.ExpectColumnToExist(column="channels"))
+            suite.add_expectation(
+                gx.expectations.ExpectColumnValuesToBeBetween(
+                    column="duration_sec", min_value=min_dur, max_value=max_dur
+                )
             )
-            checkpoint_result = checkpoint.run()
-            # Handle both dict and object (CheckpointResult)
-            success = checkpoint_result.get("success", True) if isinstance(checkpoint_result, dict) else getattr(checkpoint_result, "success", True)
-            run_id = checkpoint_result.get("run_id", "") if isinstance(checkpoint_result, dict) else getattr(checkpoint_result, "run_id", "")
-            stats = checkpoint_result.get("statistics", {}) if isinstance(checkpoint_result, dict) else getattr(checkpoint_result, "statistics", {})
-            results_list = checkpoint_result.get("results", []) if isinstance(checkpoint_result, dict) else getattr(checkpoint_result, "results", [])
+            suite.add_expectation(
+                gx.expectations.ExpectColumnValuesToBeBetween(
+                    column="sample_rate", min_value=8000, max_value=48000
+                )
+            )
+            suite.add_expectation(
+                gx.expectations.ExpectColumnValuesToBeInSet(column="channels", value_set=[1, 2])
+            )
+            suite.save()
+
+            validation_definition = gx.ValidationDefinition(
+                data=batch_definition, suite=suite, name="processed_data_validation"
+            )
+            validation_definition = context.validation_definitions.add(validation_definition)
+            result = validation_definition.run(batch_parameters=batch_parameters)
+
+            success = result.success
+            run_id = getattr(getattr(result, "meta", None), "run_id", "") or getattr(result, "batch_id", "")
+            stats = getattr(result, "statistics", {})
+            results_list = getattr(result, "results", [])
+            if results_list and hasattr(results_list[0], "to_json_dict"):
+                results_list = [r.to_json_dict() for r in results_list]
+            elif results_list and not isinstance(results_list[0], dict):
+                results_list = [getattr(r, "__dict__", r) for r in results_list]
             validation_results = {
                 "success": success,
                 "run_id": str(run_id),
