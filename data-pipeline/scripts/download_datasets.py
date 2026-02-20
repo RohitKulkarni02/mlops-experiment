@@ -4,7 +4,6 @@ Download emotion and speech datasets; validate checksums; store in data/raw/ wit
 import hashlib
 import zipfile
 from pathlib import Path
-from typing import Optional, List, Dict
 
 import requests
 from tqdm import tqdm
@@ -18,15 +17,12 @@ def compute_sha256(path: Path, chunk_size: int = 8192) -> str:
     """Compute SHA256 checksum of a file."""
     h = hashlib.sha256()
     with open(path, "rb") as f:
-        while True:
-            chunk = f.read(chunk_size)
-            if not chunk:
-                break
+        while chunk := f.read(chunk_size):
             h.update(chunk)
     return h.hexdigest()
 
 
-def download_file(url: str, dest: Path, validate_checksum: Optional[str] = None) -> bool:
+def download_file(url: str, dest: Path, validate_checksum: str | None = None) -> bool:
     """Download a file with progress bar; optionally validate checksum."""
     dest.parent.mkdir(parents=True, exist_ok=True)
     logger.info("Downloading %s -> %s", url, dest)
@@ -54,7 +50,7 @@ def download_file(url: str, dest: Path, validate_checksum: Optional[str] = None)
         return False
 
 
-def unzip_if_needed(path: Path, out_dir: Optional[Path] = None) -> Path:
+def unzip_if_needed(path: Path, out_dir: Path | None = None) -> Path:
     """Unzip if path is a zip file; return directory containing contents."""
     if not path.suffix.lower() == ".zip":
         return path.parent
@@ -66,7 +62,7 @@ def unzip_if_needed(path: Path, out_dir: Optional[Path] = None) -> Path:
     return out_dir
 
 
-def download_datasets(datasets: Optional[List[str]] = None) -> Dict[str, bool]:
+def download_datasets(datasets: list[str] | None = None) -> dict[str, bool]:
     """Download configured datasets into data/raw/<name>/."""
     cfg = load_config()
     emotion = cfg.get("emotion_datasets", {})
@@ -81,14 +77,11 @@ def download_datasets(datasets: Optional[List[str]] = None) -> Dict[str, bool]:
         url = meta.get("url")
         if not url:
             logger.info("Skipping %s (no URL configured)", name)
-            results[name] = True
-            continue
-        if meta.get("skip"):
-            logger.info("Skipping %s (marked skip:true in config)", name)
-            results[name] = True
+            results[name] = False
             continue
         raw_dir = RAW_DIR / name
         raw_dir.mkdir(parents=True, exist_ok=True)
+        # Determine filename from URL
         fname = url.rstrip("/").split("/")[-1].split("?")[0] or f"{name}.zip"
         dest = raw_dir / fname
         if dest.exists() and meta.get("checksum"):

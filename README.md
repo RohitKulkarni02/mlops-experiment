@@ -61,18 +61,10 @@ iikshana-courtroom-accessibility/
 │       ├── services/        # API clients
 │       ├── hooks/           # Custom hooks
 │       └── App.tsx
-<<<<<<< HEAD
 ├── data/
 │   ├── legal_glossary/      # 500+ legal terms
 │   └── raw/                 # Evaluation datasets
 ├── data-pipeline/           # Data acquisition, preprocessing, validation, evaluation (Airflow + DVC)
-=======
-├── airflow/                 # Airflow DAGs + Docker (orchestration); mounts data-pipeline
-├── data-pipeline/           # Data acquisition, preprocessing, validation, evaluation (scripts + config)
-├── data/
-│   ├── legal_glossary/      # 500+ legal terms
-│   └── raw/                 # Evaluation datasets
->>>>>>> origin/data_preprocessing
 ├── docs/                    # Architecture, API docs
 └── config/                  # Environment configs
 ```

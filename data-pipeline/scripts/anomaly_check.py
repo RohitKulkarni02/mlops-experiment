@@ -4,7 +4,6 @@ Can trigger email/Slack alerts when anomalies are detected (configure in Airflow
 """
 import json
 from pathlib import Path
-from typing import List, Optional
 
 from scripts.utils import get_logger, load_config, PROCESSED_DIR, RAW_DIR
 
@@ -16,7 +15,7 @@ MIN_FILES_PER_SPLIT = 1
 LABEL_IMBALANCE_RATIO = 3.0  # max ratio between most and least frequent class
 
 
-def check_missing_files(raw_dir: Path) -> List[str]:
+def check_missing_files(raw_dir: Path) -> list[str]:
     """Check for expected but missing dataset dirs or empty dirs."""
     anomalies = []
     if not raw_dir.exists():
@@ -29,7 +28,7 @@ def check_missing_files(raw_dir: Path) -> List[str]:
     return anomalies
 
 
-def check_duration_distribution(processed_dir: Path) -> List[str]:
+def check_duration_distribution(processed_dir: Path) -> list[str]:
     """Flag if many files are outside expected duration range."""
     import soundfile as sf
     anomalies = []
@@ -51,7 +50,7 @@ def check_duration_distribution(processed_dir: Path) -> List[str]:
     return anomalies
 
 
-def check_label_imbalance(processed_dir: Path) -> List[str]:
+def check_label_imbalance(processed_dir: Path) -> list[str]:
     """Check for severe label imbalance."""
     anomalies = []
     from collections import Counter
@@ -74,9 +73,9 @@ def check_label_imbalance(processed_dir: Path) -> List[str]:
 
 
 def run_anomaly_checks(
-    raw_dir: Optional[Path] = None,
-    processed_dir: Optional[Path] = None,
-    report_path: Optional[Path] = None,
+    raw_dir: Path | None = None,
+    processed_dir: Path | None = None,
+    report_path: Path | None = None,
 ) -> dict:
     """Run all checks; return report. Raise or alert if anomalies found."""
     raw_dir = raw_dir or RAW_DIR
