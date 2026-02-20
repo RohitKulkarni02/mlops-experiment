@@ -1,32 +1,30 @@
-# Dataset sources for Iikshana data pipeline
-# Many emotion/speech datasets require registration; URLs below are examples or public mirrors where available.
+---
+# Dataset sources and pipeline config
+# Datasets marked skip: true have URLs preserved but won't auto-download.
+# Remove skip: true and run data_acquisition_dag to download manually.
 
 emotion_datasets:
   RAVDESS:
-    # Ryerson Audio-Visual Database of Emotional Speech and Song
-    # Register: https://zenodo.org/record/1188976
     url: "https://zenodo.org/record/1188976/files/Audio_Speech_Actors_01-24.zip"
-    checksum: null  # set after first download for validation
-    emotion_classes: 8  # neutral, calm, happy, sad, angry, fearful, disgust, surprised
+    checksum: null
+    emotion_classes: 8
     format: wav
   IEMOCAP:
-    # USC IEMOCAP (license required)
-    url: null  # obtained after registration
-    emotion_classes: 5  # neutral, happiness, sadness, anger, frustrated
+    url: null
+    emotion_classes: 5
     format: wav
   CREMA-D:
-    # Crema-D (license required)
     url: null
     emotion_classes: 6
     format: wav
   MELD:
-    # Multimodal EmotionLines Dataset
-    url: "https://github.com/declare-lab/MELD/archive/refs/heads/master.zip"
+    url: "https://huggingface.co/datasets/declare-lab/MELD/resolve/main/MELD.Raw.tar.gz"
+    skip: true  # ~10GB, download manually by removing this line
+    checksum: null
     emotion_classes: 7
     format: wav
   TESS:
-    # Toronto Emotional Speech Set
-    url: null  # available from U of T
+    url: null
     emotion_classes: 7
     format: wav
   SAVEE:
@@ -34,27 +32,30 @@ emotion_datasets:
     emotion_classes: 7
     format: wav
   EMO-DB:
-    # Berlin EMO-DB
-    url: null
+    url: "https://zenodo.org/records/16273947/files/emodb_2.0.zip"
+    checksum: null
     emotion_classes: 7
     format: wav
 
 multilingual_speech:
   common_voice:
-    # Mozilla Common Voice (subset; full via Hugging Face datasets)
-    url: "https://huggingface.co/datasets/mozilla-foundation/common_voice_17_0"
+    url: null
     format: mp3
   voxpopuli:
     url: null
   librispeech:
-    url: null
+    url: "https://www.openslr.org/resources/12/test-clean.tar.gz"
+    checksum: null
 
-# Pipeline settings
 preprocessing:
   target_sr: 16000
   mono: true
   normalize_loudness: true
   trim_silence: true
+  courtroom_robust:
+    high_pass_hz: 80
+    peak_limit_db: -3
+    noise_reduction: false
 
 splits:
   dev: 0.20

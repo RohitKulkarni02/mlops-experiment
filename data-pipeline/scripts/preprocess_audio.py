@@ -3,6 +3,7 @@ Audio preprocessing: 16 kHz mono WAV, loudness normalization, silence trimming.
 Reads from data/raw, writes to a staging dir; use stratified_split to produce dev/test/holdout.
 """
 from pathlib import Path
+from typing import List, Optional, Tuple, Union
 
 import numpy as np
 import soundfile as sf
@@ -17,7 +18,7 @@ except ImportError:
     librosa = None  # type: ignore
 
 
-def load_audio(path: Path, sr: int | None = None) -> tuple[np.ndarray, int]:
+def load_audio(path: Path, sr: Optional[int] = None) -> Tuple[np.ndarray, int]:
     """Load audio; return (samples, sample_rate)."""
     data, rate = sf.read(path)
     if data.ndim > 1:
@@ -93,7 +94,7 @@ def process_one(
         return False
 
 
-def collect_audio_files(root: Path, exts: tuple[str, ...] = (".wav", ".mp3", ".flac")) -> list[Path]:
+def collect_audio_files(root: Path, exts: Tuple[str, ...] = (".wav", ".mp3", ".flac")) -> List[Path]:
     """Collect all audio files under root."""
     files = []
     for ext in exts:
@@ -102,9 +103,9 @@ def collect_audio_files(root: Path, exts: tuple[str, ...] = (".wav", ".mp3", ".f
 
 
 def run_preprocessing(
-    raw_subdir: str | Path | None = None,
-    out_subdir: Path | None = None,
-) -> tuple[int, int]:
+    raw_subdir: Optional[Union[str, Path]] = None,
+    out_subdir: Optional[Path] = None,
+) -> Tuple[int, int]:
     """Run preprocessing on raw data. Returns (success_count, fail_count)."""
     cfg = load_config()
     preproc = cfg.get("preprocessing", {})

@@ -4,6 +4,7 @@ Outputs JSON schema and quality report. Compatible with Great Expectations patte
 """
 import json
 from pathlib import Path
+from typing import Optional, List, Tuple, Dict, Any
 
 import soundfile as sf
 
@@ -30,7 +31,7 @@ def validate_one_audio(
     expected_sr: int = 16000,
     min_duration: float = 0.5,
     max_duration: float = 30.0,
-) -> tuple[bool, dict]:
+) -> Tuple[bool, Dict]:
     """Validate one audio file; return (passed, report_dict)."""
     report = {"path": str(path), "errors": []}
     try:
@@ -59,7 +60,7 @@ def validate_one_audio(
         return False, report
 
 
-def validate_manifest_labels(manifest_path: Path, allowed: list[str] | None) -> tuple[bool, list[str]]:
+def validate_manifest_labels(manifest_path: Path, allowed: Optional[List[str]]) -> Tuple[bool, List[str]]:
     """Validate emotion labels in manifest.json against allowed set."""
     errors = []
     if not manifest_path.exists():
@@ -76,10 +77,10 @@ def validate_manifest_labels(manifest_path: Path, allowed: list[str] | None) -> 
 
 
 def run_validation(
-    data_dir: Path | None = None,
-    schema_out: Path | None = None,
-    report_out: Path | None = None,
-) -> dict:
+    data_dir: Optional[Path] = None,
+    schema_out: Optional[Path] = None,
+    report_out: Optional[Path] = None,
+) -> Dict:
     """Validate processed splits and write schema + quality report."""
     cfg = load_config()
     val_cfg = cfg.get("validation", {})
@@ -95,13 +96,13 @@ def run_validation(
     if report_out is None:
         report_out = data_dir / "quality_report.json"
 
-    results = {"files_checked": 0, "passed": 0, "failed": 0, "file_reports": [], "manifest_errors": []}
+    results: Dict[str, Any] = {"files_checked": 0, "passed": 0, "failed": 0, "file_reports": [], "manifest_errors": []}
     for split in ("dev", "test", "holdout"):
         split_dir = data_dir / split
         if not split_dir.is_dir():
             continue
         manifest_path = split_dir / "manifest.json"
-        allowed = val_cfg.get("allowed_emotion_labels", {}).get("RAVDESS")  # or from config per-dataset
+        allowed = val_cfg.get("allowed_emotion_labels", {}).get("RAVDESS")
         m_ok, m_errors = validate_manifest_labels(manifest_path, allowed)
         if m_errors:
             results["manifest_errors"].extend(m_errors)

@@ -5,6 +5,7 @@ and optionally by language, emotion, demographics, audio quality.
 import json
 import re
 from pathlib import Path
+from typing import Dict, List, Optional, Tuple
 
 from scripts.utils import get_logger, load_config, PROCESSED_DIR
 
@@ -44,7 +45,7 @@ def infer_emotion(path: Path) -> str:
     return "unknown"
 
 
-def collect_meta(files: list[Path]) -> list[dict]:
+def collect_meta(files: List[Path]) -> List[dict]:
     """Collect path, speaker_id, emotion for each file."""
     return [
         {"path": str(f), "speaker_id": infer_speaker_id(f), "emotion": infer_emotion(f)}
@@ -53,16 +54,16 @@ def collect_meta(files: list[Path]) -> list[dict]:
 
 
 def stratified_split_by_speaker(
-    meta: list[dict],
+    meta: List[dict],
     dev_ratio: float = 0.20,
     test_ratio: float = 0.70,
     holdout_ratio: float = 0.10,
     seed: int = 42,
-) -> tuple[list[dict], list[dict], list[dict]]:
+) -> Tuple[List[dict], List[dict], List[dict]]:
     """Split so that each speaker appears in only one split (no overlap)."""
     import random
     rng = random.Random(seed)
-    by_speaker: dict[str, list[dict]] = {}
+    by_speaker: Dict[str, List[dict]] = {}
     for m in meta:
         sid = m["speaker_id"]
         by_speaker.setdefault(sid, []).append(m)
@@ -86,10 +87,10 @@ def stratified_split_by_speaker(
 
 
 def run_split(
-    staged_dir: Path | None = None,
-    out_dir: Path | None = None,
-    extensions: tuple[str, ...] = (".wav",),
-) -> dict[str, int]:
+    staged_dir: Optional[Path] = None,
+    out_dir: Optional[Path] = None,
+    extensions: Tuple[str, ...] = (".wav",),
+) -> Dict[str, int]:
     """Build splits from staged preprocessed audio and write manifest + copy/symlink."""
     cfg = load_config()
     splits_cfg = cfg.get("splits", {})
