@@ -7,8 +7,6 @@ from pathlib import Path
 
 import pandas as pd
 
-from scipy.stats import chisquare
-from sklearn.metrics import accuracy_score, f1_score
 from scripts.utils import get_logger, load_config, PROCESSED_DIR
 
 logger = get_logger("detect_bias")
