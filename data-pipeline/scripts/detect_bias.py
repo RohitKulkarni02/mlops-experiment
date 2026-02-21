@@ -7,6 +7,8 @@ from pathlib import Path
 
 import pandas as pd
 
+from scipy.stats import chisquare
+from sklearn.metrics import accuracy_score, f1_score
 from scripts.utils import get_logger, load_config, PROCESSED_DIR
 
 logger = get_logger("detect_bias")
@@ -51,6 +53,20 @@ def slice_by_speaker(entries: list[dict]) -> dict[str, list[dict]]:
         by_speaker.setdefault(sid, []).append(e)
     return by_speaker
 
+def slice_by_duration(entries: list[dict]) -> dict[str, list[dict]]:
+    """Slice audio into short (< 2s), medium (2-5s), and long (> 5s) buckets."""
+    by_duration: dict[str, list[dict]] = {"short": [], "medium": [], "long": []}
+    for e in entries:
+        # Assuming duration is added to the manifest during stratified_split
+        dur = e.get("duration_sec", 0)
+        if dur < 2.0:
+            by_duration["short"].append(e)
+        elif dur <= 5.0:
+            by_duration["medium"].append(e)
+        else:
+            by_duration["long"].append(e)
+    return by_duration
+
 
 def compute_counts_per_slice(slices: dict[str, list[dict]]) -> dict[str, int]:
     """Return count per slice for imbalance check."""
@@ -75,20 +91,39 @@ def run_bias_analysis(
 
     by_emotion = slice_by_emotion(entries)
     by_speaker = slice_by_speaker(entries)
+    by_duration = slice_by_duration(entries)
     emotion_counts = compute_counts_per_slice(by_emotion)
     speaker_counts = compute_counts_per_slice(by_speaker)
+    duration_counts = compute_counts_per_slice(by_duration)
+
+    cfg = load_config().get("bias_detection", {})
+    disparity_threshold = cfg.get("disparity_threshold", 0.5)
 
     total = len(entries)
     expected_per_emotion = total / len(by_emotion) if by_emotion else 0
+
+    expected_per_duration = total / len(by_duration) if by_duration else 0
+
     disparities = []
     for label, count in emotion_counts.items():
-        if expected_per_emotion and abs(count - expected_per_emotion) / expected_per_emotion > 0.5:
+        if expected_per_emotion and abs(count - expected_per_emotion) / expected_per_emotion > disparity_threshold:
             disparities.append({
                 "slice": "emotion",
                 "value": label,
                 "count": count,
                 "expected_approx": round(expected_per_emotion, 1),
-                "note": "Imbalanced emotion class; consider re-sampling or stratified evaluation.",
+                "note": f"Imbalanced emotion class exceeds {disparity_threshold*100}% threshold.",
+            })
+
+    for bucket, count in duration_counts.items():
+            # Using a 0.5 (50%) threshold, but you can adjust this
+        if expected_per_duration and abs(count - expected_per_duration) / expected_per_duration > 0.5:
+            disparities.append({
+                "slice": "duration",
+                "value": bucket,
+                "count": count,
+                "expected_approx": round(expected_per_duration, 1),
+                "note": f"Imbalanced duration bucket ({bucket}); model may be biased against this length.",
             })
 
     # PDF §3.2: Use Fairlearn for data slicing (MetricFrame per-group metrics)
@@ -134,28 +169,37 @@ def run_bias_analysis(
     report = {
         "total_entries": total,
         "by_emotion": emotion_counts,
+        "by_duration": duration_counts, # NEW: Expose the duration stats
         "by_speaker_count": len(by_speaker),
         "speaker_sample_counts": dict(list(speaker_counts.items())[:20]),
         "disparities": disparities,
-        "fairlearn_by_group": fairlearn_by_group,
-        "recommendations": [
+        "fairlearn_by_group": fairlearn_by_group, #
+        "recommendations": [ #
             "Use stratified evaluation and report metrics per emotion slice.",
             "If deploying, consider confidence thresholding for under-represented classes.",
+            "Ensure duration distribution matches expected real-world deployment." # NEW
         ],
     }
-    report_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(report_path, "w", encoding="utf-8") as f:
-        json.dump(report, f, indent=2)
 
-    logger.info("Bias report written to %s; %d disparities noted", report_path, len(disparities))
+    report_path.parent.mkdir(parents=True, exist_ok=True) #
+    with open(report_path, "w", encoding="utf-8") as f: #
+        json.dump(report, f, indent=2) #
+
+    logger.info("Bias report written to %s; %d disparities noted", report_path, len(disparities)) #
     return report
 
 
 def main() -> None:
     import sys
     data_dir = Path(sys.argv[1]) if len(sys.argv) > 1 else None
-    run_bias_analysis(data_dir=data_dir)
 
+    # Run the analysis
+    report = run_bias_analysis(data_dir=data_dir)
+
+    # Fail the Airflow task if there are severe disparities
+    if len(report.get("disparities", [])) > 0:
+        logger.error("Pipeline halted: Bias disparities detected.")
+        sys.exit(1) # Airflow will mark the task as failed
 
 if __name__ == "__main__":
     main()
